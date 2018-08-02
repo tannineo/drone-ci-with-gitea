@@ -1,0 +1,79 @@
+version: '2'
+
+networks:
+  gitea:
+    external: false
+
+services:
+  gitea-server:
+    image: gitea/gitea:1.3.2
+    volumes:
+      - ./data:/data
+    ports:
+      - "3000:3000"
+      - "22:22"
+    depends_on:
+      - db
+    networks:
+      - gitea
+    restart: always
+
+  drone-server:
+    image: drone/drone:0.8
+    depends_on:
+      - gitea-server
+    ports:
+      - "8000:8000"
+      - "9000"
+    volumes:
+      - /var/lib/drone:/var/lib/drone/
+    restart: always
+    environment:
+      - DRONE_OPEN=true
+      - DRONE_HOST=http://ci.bflypoker.com
+      - DRONE_GITEA=true
+      - DRONE_GITEA_URL=http://git.bflypoker.com
+      - DRONE_SECRET=yourpassword
+
+  db:
+    image: mysql:5.7
+    restart: always
+    networks:
+      - gitea
+    environment:
+      - MYSQL_ROOT_PASSWORD=yourpassword
+      - MYSQL_DATABASE=gitea
+      - MYSQL_USER=gitea
+      - MSYQL_PASSWORD=yourpassword
+    volumes:
+      - ./db/:/var/lib/mysql
+
+  drone-agent-1:
+    image: drone/agent:0.8
+
+    command: agent
+    restart: always
+    depends_on:
+      - drone-server
+    links:
+      - drone-server
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DRONE_SERVER=drone-server:9000
+      - DRONE_SECRET=yourpassword
+
+  drone-agent-2:
+    image: drone/agent:0.8
+
+    command: agent
+    restart: always
+    depends_on:
+      - drone-server
+    links:
+      - drone-server
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DRONE_SERVER=drone-server:9000
+      - DRONE_SECRET=yourpassword
